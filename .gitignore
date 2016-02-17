@@ -1,0 +1,10 @@
+/_build
+/cover
+/deps
+erl_crash.dump
+*.ez
+lib/dungeon.ex
+lib/room.ex
+lib/tile.ex
+*.beam
+dungeon_generator
