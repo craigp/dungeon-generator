@@ -15,12 +15,11 @@ defmodule GrowingTree do
     #   end)
     # end)
     IO.write "\e[2J" # clear the screen
-    # {grid, rooms} = create_rooms(grid, 1000)
+    {grid, rooms} = create_rooms(grid, 1000)
     grid = carve_passages(grid)
-    # grid = find_connectors(grid, rooms)
-    print grid
-    # grid = remove_deadends(grid)
-    # print(grid)
+    grid = find_connectors(grid, rooms)
+    grid = remove_deadends(grid)
+    print(grid)
     :ok
   end
 
@@ -65,9 +64,9 @@ defmodule GrowingTree do
     {card, direction}
   end
 
-  def get_exits(cell) do
+  def get_exits(%Cell{val: val} = cell) do
     Enum.reduce(get_directions(), [], fn {_card, {bw, _dx, _dy}} = direction, exits ->
-      if Bitwise.band(cell, bw) != 0 do
+      if Bitwise.band(val, bw) != 0 do
         [direction|exits]
       else
         exits
@@ -75,14 +74,14 @@ defmodule GrowingTree do
     end)
   end
 
-  def remove_deadends(grid) do
-    grid
+  def remove_deadends(%Grid{cells: cells} = grid) do
+    cells
     |> Enum.with_index
     |> Enum.reduce([], fn {row, y}, deadends ->
       row
       |> Enum.with_index
-      |> Enum.reduce(deadends, fn {cell, x}, deadends ->
-        if Bitwise.band(cell, 32) == 0 do # not a door
+      |> Enum.reduce(deadends, fn {%Cell{val: val} = cell, x}, deadends ->
+        if Bitwise.band(val, 32) == 0 do # not a door
           exits = get_exits(cell)
           if length(exits) == 1 do
             [{x, y, List.first(exits)}|deadends]
@@ -122,25 +121,26 @@ defmodule GrowingTree do
       # IO.puts "added to deadends"
       deadends = [{nx, ny, List.first(exits)}|deadends]
     end
-    # print(grid)
-    # :timer.sleep(1)
+    print(grid)
+    :timer.sleep(10)
     remove_deadends(deadends, grid)
   end
 
-  def find_connectors(grid, rooms) do
-    Enum.map(rooms, fn {x, y, width, height} = room ->
-      y = Enum.random(y..(y + height))
-      x = Enum.random([x, x + width])
-      {room, x, y}
+  def find_connectors(%Grid{} = grid, rooms) do
+    Enum.map(rooms, fn %Room{rect: %Rectangle{x: rx, y: ry, width: width, height: height}} = room ->
+      y = Enum.random(ry..(ry + height))
+      x = Enum.random([rx, (rx + width)])
+      {{rx, ry, width, height}, x, y}
     end)
     |> Enum.reduce(grid, fn {{rx, _ry, _, _}, x, y}, grid ->
+      %Cell{} = cell = Grid.cell_at(grid, {x, y})
       grid = update_cell(grid, x, y, 32)
       {_card, {bw, dx, dy}} = direction = if x == rx do
         # on the eastern side of the room
-        get_direction(:w) # open to the west
+        get_direction(:west) # open to the west
       else
         # on the western side of the woom
-        get_direction(:e) # open to the east
+        get_direction(:east) # open to the east
       end
       grid = update_cell(grid, x, y, bw)
       nx = x + dx
@@ -213,29 +213,21 @@ defmodule GrowingTree do
     carve_cells(grid, cells)
   end
 
-  def update_cell(cells, x, y, 0) do
-    row = Enum.at(cells, y)
-    %Cell{} = cell = Enum.at(row, x)
-    cell = %{cell | val: 0}
-    row = List.replace_at(row, x, cell)
-    List.replace_at(cells, y, row)
+  def update_cell(%Grid{} = grid, x, y, 0) do
+    update_cell_with(grid, x, y, 0)
   end
 
-  def update_cell(cells, x, y, bw) do
-    row = Enum.at(cells, y)
-    %Cell{val: val} = cell = Enum.at(row, x)
+  def update_cell(%Grid{} = grid, x, y, bw) do
+    %Cell{val: val} = cell = Grid.cell_at(grid, {x, y})
     val = Bitwise.bor(val, bw)
     cell = %{cell | val: val}
-    row = List.replace_at(row, x, cell)
-    List.replace_at(cells, y, row)
+    Grid.put_cell(grid, cell)
   end
 
-  def update_cell_with(cells, x, y, val) do
-    row = Enum.at(cells, y)
-    %Cell{} = cell = Enum.at(row, x)
+  def update_cell_with(%Grid{} = grid, x, y, val) do
+    %Cell{} = cell = Grid.cell_at(grid, {x, y})
     cell = %{cell | val: val}
-    row = List.replace_at(row, x, cell)
-    List.replace_at(cells, y, row)
+    Grid.put_cell(grid, cell)
   end
 
   def get_cell_at(grid, x, y) do
@@ -243,14 +235,40 @@ defmodule GrowingTree do
     Enum.at(row, x)
   end
 
-  def carve_cells(grid, []), do: grid
-
-  def carve_cells(grid, [cell|_] = cells) do
-    carve_cells(grid, cells, cell, get_random_direction())
+  def carve_cells(grid, cells) when length(cells) > 0 do
+    directions =
+      get_directions
+      |> Enum.shuffle
+    carve_cells(grid, cells, directions)
   end
 
-  def carve_cells(grid, cells, {x, y} = cell, {card, {bw, dx, dy}} = direction) do
-    IO.puts "carving #{card} from #{x}/#{y} (#{length(cells)} cells left)"
+  def carve_cells(grid, _cells) do
+    grid
+  end
+
+  def carve_cells(grid, cells, directions) when is_list(directions) do
+    cell = List.first(cells)
+    carve_cells(grid, cells, cell, directions)
+  end
+
+  def carve_cells(grid, cells, {card, _}) do
+    {direction, directions} = Keyword.pop(get_directions, card)
+    cell = List.first(cells)
+    carve_cells(grid, cells, cell, directions, {card, direction})
+  end
+
+  def carve_cells(grid, cells, cell, directions) when length(directions) > 0 do
+    key = directions |> Keyword.keys |> List.first
+    {direction, directions} = Keyword.pop(directions, key)
+    carve_cells(grid, cells, cell, directions, {key, direction})
+  end
+
+  def carve_cells(grid, cells, _cell, _directions) do
+    [_removed|updated_cells] = cells
+    carve_cells(grid, updated_cells)
+  end
+
+  def carve_cells(grid, cells, {x, y} = cell, directions, {card, {bw, dx, dy}} = direction) when length(cells) > 0 do
     nx = x + dx
     ny = y + dy
     case Grid.cell_at(grid, {nx, ny}) do
@@ -260,63 +278,15 @@ defmodule GrowingTree do
           |> Cell.open(card)
           |> Cell.open(get_opposite_direction(card))
         grid = Grid.put_cell(grid, grid_cell)
-        print(grid, cell)
-        :timer.sleep(100)
+        # print(grid)
+        # :timer.sleep(1)
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
-        carve_cells(grid, cells, {nx, ny}, direction)
+        carve_cells(grid, [{nx, ny}|cells], direction)
         # carve_cells(grid, cells)
       _ ->
-        carve_cells(grid, cells)
+        carve_cells(grid, cells, cell, directions)
     end
   end
-
-  # def carve_cells(grid, cells, {x, y} = cell, directions, {card, {bw, dx, dy}} = direction) when length(cells) > 0 do
-  #   nx = x + dx
-  #   ny = y + dy
-  #   row = Enum.at(grid, ny)
-  #   if row do
-  #     grid_cell = Enum.at(row, nx)
-  #     if ny in 0..(length(grid) - 1) and nx in 0..(length(row) - 1) and grid_cell == 0 do
-  #       grid =
-  #         grid
-  #         |> update_cell(x, y, bw)
-  #         |> update_cell(nx, ny, opposite(direction))
-  #       # print(grid)
-  #       # :timer.sleep(10)
-  #       cells = [{nx, ny}|cells]
-  #       # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
-  #       carve_cells(grid, cells, direction)
-  #       # carve_cells(grid, cells)
-  #     else
-  #       carve_cells(grid, cells, cell, directions)
-  #     end
-  #   else
-  #     carve_cells(grid, cells, cell, directions)
-  #   end
-  # end
-
-  # def carve_cells(%Grid{cells: grid_cells} = grid, [{x, y}|_] = cells, [{card, {_bw, dx, dy}} = direction|directions]) do
-  #   IO.puts "#{length(grid_cells)} grid cells"
-  #   IO.puts "carving #{card} from #{x}/#{y} (#{length(directions)} directions left, #{length(cells)} cells left)"
-  #   nx = x + dx
-  #   ny = y + dy
-  #   case Grid.cell_at(grid, {nx, ny}) do
-  #     %Cell{} = grid_cell ->
-  #       grid_cell =
-  #         grid_cell
-  #         |> Cell.open(card)
-  #         |> Cell.open(get_opposite_direction(card))
-  #       grid = Grid.put_cell(grid, grid_cell)
-  #       print(grid)
-  #       :timer.sleep(1)
-  #       # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
-  #       carve_cells(grid, [{nx, ny}|cells], [direction|Enum.shuffle(directions)])
-  #       # carve_cells(grid, cells)
-  #     nil ->
-  #       IO.puts "no cell found"
-  #       carve_cells(grid, cells, directions)
-  #   end
-  # end
 
   def write(text, color \\ 0) do
     [String.to_atom("color#{color}_background"), text] |> Bunt.ANSI.format |> IO.write

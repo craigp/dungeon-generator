@@ -19,10 +19,10 @@ defmodule Rectangle do
 
   ### Examples
       iex> Rectangle.new(1, 2, 3, 4)
-      %Rectangle{x: 1, y: 2, height: 3, width: 4}
+      %Rectangle{x: 1, y: 2, width: 3, height: 4}
   """
   @spec new(integer, integer, integer, integer) :: Rectangle.t
-  def new(x, y, height, width) do
+  def new(x, y, width, height) do
     %Rectangle{
       x: x,
       y: y,
@@ -65,8 +65,8 @@ defmodule Rectangle do
   def overlaps?(%Rectangle{
     x: x,
     y: y,
-    height: height,
-    width: width
+    width: width,
+    height: height
   }, %Rectangle{} = rect) do
     within?(rect, {x, y}) or within?(rect, {x + height, y + width})
   end
