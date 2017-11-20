@@ -17,8 +17,8 @@ defmodule GrowingTree do
     IO.write "\e[2J" # clear the screen
     {grid, rooms} = create_rooms(grid, 1000)
     grid = carve_passages(grid)
-    grid = find_connectors(grid, rooms)
-    grid = remove_deadends(grid)
+    # grid = find_connectors(grid, rooms)
+    # grid = remove_deadends(grid)
     print(grid)
     :ok
   end

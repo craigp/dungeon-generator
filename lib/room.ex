@@ -38,7 +38,7 @@ defmodule Room do
       true
 
       iex> room1 = Rectangle.new(2, 2, 2, 2) |> Room.new
-      iex> room2 = Rectangle.new(6, 4, 2, 2) |> Room.new
+      iex> room2 = Rectangle.new(7, 7, 2, 2) |> Room.new
       iex> Room.overlaps?(room1, room2)
       false
   """
@@ -49,21 +49,21 @@ defmodule Room do
       y: y,
       width: width,
       height: height
-    }
+    } = rect1
   }, %Room{
     rect: %Rectangle{
       x: other_x,
       y: other_y,
       width: other_width,
       height: other_height
-    }
+    } = rect2
   }) do
-    not(((x + width + 2) < other_x) or
-      ((other_x + other_width + 2) < x) or
-      ((y + height + 2) < other_y) or
-      ((other_y + other_height + 2) < y))
-    # Rectangle.overlaps?(to_room_overlap_rect(rect1),
-    #   to_room_overlap_rect(rect2))
+    # not((((x - 1) + width + 2) < other_x) or
+    #   ((other_x + other_width + 2) < x) or
+    #   (((y - 1) + height + 2) < other_y) or
+    #   ((other_y + other_height + 2) < y))
+    Rectangle.overlaps?(to_room_overlap_rect(rect1),
+      to_room_overlap_rect(rect2))
   end
 
   defp to_room_overlap_rect(%Rectangle{
@@ -73,10 +73,10 @@ defmodule Room do
     height: height
   }) do
     %Rectangle{
-      x: x - 2,
-      y: y - 2,
-      width: width + 3,
-      height: height + 3
+      x: x - 1,
+      y: y - 1,
+      width: width + 2,
+      height: height + 2
     }
   end
 

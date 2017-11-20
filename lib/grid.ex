@@ -20,15 +20,15 @@ defmodule Grid do
 
       iex> Grid.new(3, 4)
       %Grid{width: 3, height: 4, cells: [
-        [%Cell{x: 1, y: 1, val: 0}, %Cell{x: 2, y: 1, val: 0}, %Cell{x: 3, y: 1, val: 0}],
-        [%Cell{x: 1, y: 2, val: 0}, %Cell{x: 2, y: 2, val: 0}, %Cell{x: 3, y: 2, val: 0}],
-        [%Cell{x: 1, y: 3, val: 0}, %Cell{x: 2, y: 3, val: 0}, %Cell{x: 3, y: 3, val: 0}],
-        [%Cell{x: 1, y: 4, val: 0}, %Cell{x: 2, y: 4, val: 0}, %Cell{x: 3, y: 4, val: 0}]
+        [%Cell{x: 0, y: 0, val: 0}, %Cell{x: 1, y: 0, val: 0}, %Cell{x: 2, y: 0, val: 0}],
+        [%Cell{x: 0, y: 1, val: 0}, %Cell{x: 1, y: 1, val: 0}, %Cell{x: 2, y: 1, val: 0}],
+        [%Cell{x: 0, y: 2, val: 0}, %Cell{x: 1, y: 2, val: 0}, %Cell{x: 2, y: 2, val: 0}],
+        [%Cell{x: 0, y: 3, val: 0}, %Cell{x: 1, y: 3, val: 0}, %Cell{x: 2, y: 3, val: 0}]
       ]}
   """
   @spec new(width, height) :: Grid.t
   def new(width, height) do
-    cells = for y <- 1..height, do: for x <- 1..width, do: Cell.new(x, y)
+    cells = for y <- 0..(height - 1), do: for x <- 0..(width - 1), do: Cell.new(x, y)
     %Grid{width: width, height: height, cells: cells}
   end
 
@@ -73,16 +73,20 @@ defmodule Grid do
 
       iex> Grid.row_at(Grid.new(3, 3), 2)
       [
+        %Cell{x: 0, y: 2, val: 0},
         %Cell{x: 1, y: 2, val: 0},
-        %Cell{x: 2, y: 2, val: 0},
-        %Cell{x: 3, y: 2, val: 0}
+        %Cell{x: 2, y: 2, val: 0}
       ]
 
       iex> Grid.row_at(Grid.new(3, 3), 3)
       nil
 
       iex> Grid.row_at(Grid.new(3, 3), 0)
-      nil
+      [
+        %Cell{x: 0, y: 0, val: 0},
+        %Cell{x: 1, y: 0, val: 0},
+        %Cell{x: 2, y: 0, val: 0}
+      ]
 
       iex> Grid.row_at(Grid.new(3, 3), -1)
       nil
@@ -94,8 +98,8 @@ defmodule Grid do
   def row_at(%Grid{
     cells: cells,
     height: height
-  }, y) when y > 1 and y < height do
-    Enum.at(cells, y - 1)
+  }, y) when y >= 0 and y < height do
+    Enum.at(cells, y)
   end
 
   def row_at(_, _), do: nil
@@ -105,8 +109,8 @@ defmodule Grid do
 
   ### Examples
 
-      iex> Grid.cell_at(Grid.new(5, 5), {2, 3})
-      %Cell{x: 2, y: 3, val: 0}
+      iex> Grid.cell_at(Grid.new(5, 5), {1, 2})
+      %Cell{x: 1, y: 2, val: 0}
 
       iex> Grid.cell_at(Grid.new(5, 5), {5, 3})
       nil
@@ -120,14 +124,14 @@ defmodule Grid do
   @spec cell_at(Grid.t, coords) :: Cell.t
   def cell_at(%Grid{
     width: width
-  } = grid, {x, y}) when x > 1 and x < width do
+  } = grid, {x, y}) when x >= 0 and x < width do
     grid
     |> row_at(y)
     |> case do
       nil ->
         nil
       row ->
-        Enum.at(row, x - 1)
+        Enum.at(row, x)
     end
   end
 
@@ -138,21 +142,21 @@ defmodule Grid do
 
   ### Examples
 
-      iex> Grid.put_cell(Grid.new(3, 4), %Cell{x: 2, y: 3, val: 16})
+      iex> Grid.put_cell(Grid.new(3, 4), %Cell{x: 1, y: 2, val: 16})
       %Grid{height: 4, width: 3, cells: [
-        [%Cell{x: 1, y: 1, val: 0}, %Cell{x: 2, y: 1, val: 0}, %Cell{x: 3, y: 1, val: 0}],
-        [%Cell{x: 1, y: 2, val: 0}, %Cell{x: 2, y: 2, val: 0}, %Cell{x: 3, y: 2, val: 0}],
-        [%Cell{x: 1, y: 3, val: 0}, %Cell{x: 2, y: 3, val: 16}, %Cell{x: 3, y: 3, val: 0}],
-        [%Cell{x: 1, y: 4, val: 0}, %Cell{x: 2, y: 4, val: 0}, %Cell{x: 3, y: 4, val: 0}]
+        [%Cell{x: 0, y: 0, val: 0}, %Cell{x: 1, y: 0, val: 0}, %Cell{x: 2, y: 0, val: 0}],
+        [%Cell{x: 0, y: 1, val: 0}, %Cell{x: 1, y: 1, val: 0}, %Cell{x: 2, y: 1, val: 0}],
+        [%Cell{x: 0, y: 2, val: 0}, %Cell{x: 1, y: 2, val: 16}, %Cell{x: 2, y: 2, val: 0}],
+        [%Cell{x: 0, y: 3, val: 0}, %Cell{x: 1, y: 3, val: 0}, %Cell{x: 2, y: 3, val: 0}]
       ]}
   """
   @spec put_cell(Grid, Cell.t) :: Grid.t
   def put_cell(%Grid{cells: cells} = grid, %Cell{x: x, y: y} = cell) do
     row =
       cells
-      |> Enum.at(y - 1)
-      |> List.replace_at(x - 1, cell)
-    new_cells = List.replace_at(cells, y - 1, row)
+      |> Enum.at(y)
+      |> List.replace_at(x, cell)
+    new_cells = List.replace_at(cells, y, row)
     %{grid | cells: new_cells}
   end
 
