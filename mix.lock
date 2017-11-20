@@ -1,1 +1,1 @@
-%{"bunt": {:hex, :bunt, "0.1.4"}}
+%{"bunt": {:hex, :bunt, "0.2.0", "951c6e801e8b1d2cbe58ebbd3e616a869061ddadcc4863d0a2182541acae9a38", [:mix], [], "hexpm"}}

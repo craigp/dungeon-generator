@@ -8,3 +8,4 @@ lib/room.ex
 lib/tile.ex
 *.beam
 dungeon_generator
+tags
