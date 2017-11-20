@@ -278,8 +278,8 @@ defmodule GrowingTree do
           |> Cell.open(card)
           |> Cell.open(get_opposite_direction(card))
         grid = Grid.put_cell(grid, grid_cell)
-        # print(grid)
-        # :timer.sleep(1)
+        print(grid)
+        :timer.sleep(1)
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
         carve_cells(grid, [{nx, ny}|cells], direction)
         # carve_cells(grid, cells)
@@ -348,11 +348,15 @@ defmodule GrowingTree do
             end |> write(236)
             if Bitwise.band(val, 4) != 0 do
               # open to the east
-              %Cell{val: next_val} = Enum.at(row, x + 1)
-              if Bitwise.bor(next_val, 2) != 0 do # is the next cell open to the south?
-                " "
-              else
-                "_"
+              case Enum.at(row, x + 1) do
+                %Cell{val: next_val} ->
+                  if Bitwise.bor(next_val, 2) != 0 do # is the next cell open to the south?
+                    " "
+                  else
+                    "_"
+                  end
+                nil ->
+                  "_"
               end
             else
               "|" # not open to the east
