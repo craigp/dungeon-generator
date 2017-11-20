@@ -248,8 +248,8 @@ defmodule GrowingTree do
           grid
           |> update_cell(x, y, bw)
           |> update_cell(nx, ny, opposite(direction))
-        # print(grid)
-        # :timer.sleep(10)
+        print(grid)
+        :timer.sleep(10)
         cells = [{nx, ny}|cells]
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
         carve_cells(grid, cells, direction)
