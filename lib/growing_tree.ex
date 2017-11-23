@@ -16,10 +16,11 @@ defmodule GrowingTree do
     # end)
     IO.write "\e[2J" # clear the screen
     {grid, rooms} = create_rooms(grid, 1000)
-    grid = carve_passages(grid)
     grid = find_connectors(grid, rooms)
+    grid = carve_passages(grid, rooms)
     grid = remove_deadends(grid)
     print(grid)
+    IO.inspect Grid.cell_at(grid, {0, 0})
     :ok
   end
 
@@ -107,10 +108,10 @@ defmodule GrowingTree do
     # grid = update_cell_with(grid, nx, ny, Bitwise.bxor(nval, bw))
     ncell = Cell.close(ncell, ncard)
     grid = Grid.put_cell(grid, ncell)
-    exits = Grid.cell_at(grid, {nx, ny}) |> get_exits
+    exits = get_exits(ncell)
     # IO.puts "cell should now have one less exit: #{length(exits)}"
     if length(exits) == 1 do
-      deadends = [{Grid.cell_at(grid, {nx, ny}), List.first(exits)}|deadends]
+      deadends = [{ncell, List.first(exits)}|deadends]
     end
     print grid
     :timer.sleep(1)
@@ -124,25 +125,30 @@ defmodule GrowingTree do
       {{rx, ry, width, height}, x, y}
     end)
     |> Enum.reduce(grid, fn {{rx, _ry, _, _}, x, y}, grid ->
-      %Cell{} = cell = Grid.cell_at(grid, {x, y})
-      cell = Cell.is_doorway(cell)
-      grid = Grid.put_cell(grid, cell)
       {card, {_bw, dx, dy}} = direction = if x == rx do
         # on the eastern side of the room
         get_direction(:west) # open to the west
       else
-        IO.inspect east: {x, y}
         # on the western side of the woom
         get_direction(:east) # open to the east
       end
-      # grid = update_cell(grid, x, y, bw)
-      cell = Cell.open(cell, card)
+      # open the cell in the direction of the doorway
+      cell =
+        grid
+        |> Grid.cell_at({x, y})
+        |> Cell.is_doorway
+        |> Cell.open(card)
+      grid = Grid.put_cell(grid, cell)
+      # get the next cell in that direction (outside the room)
       nx = x + dx
       ny = y + dy
       {ncard, {_bw, _, _}} = opposite(direction)
-      ncell = Grid.cell_at(grid, {nx, ny}) |> Cell.open(ncard)
-      # _grid = update_cell(grid, nx, ny, bw)
-      Grid.put_cell(grid, ncell)
+      # open this cell in the opposite direction, into the room
+      next_cell =
+        grid
+        |> Grid.cell_at({nx, ny})
+        |> Cell.open(ncard)
+      Grid.put_cell(grid, next_cell)
     end)
   end
 
@@ -212,10 +218,14 @@ defmodule GrowingTree do
     }
   end
 
-  def carve_passages(%Grid{height: height, width: width} = grid) do
-    x = Enum.random(1..width)
-    y = Enum.random(1..height)
-    cells = [{x, y}]
+  def carve_passages(%Grid{height: height, width: width} = grid, rooms) do
+    [room|_] = Enum.shuffle(rooms)
+    cells = Grid.cells(grid, room)
+    %Cell{x: x, y: y} = doorway = Enum.find(cells, &Cell.is_doorway?/1)
+    [{card, {_, dx, dy}}|_] = get_exits(doorway)
+    cells = [{x + dx, y + dy}]
+    # x = Enum.random(0..width-1)
+    # y = Enum.random(0..height-1)
     carve_cells(grid, cells)
   end
 
@@ -278,15 +288,15 @@ defmodule GrowingTree do
     nx = x + dx
     ny = y + dy
     case Grid.cell_at(grid, {nx, ny}) do
-      %Cell{val: 0} = next_cell ->
+      %Cell{} = next_cell ->
         grid_cell = Cell.open(Grid.cell_at(grid, cell), card)
         next_cell = Cell.open(next_cell, get_opposite_direction(card))
         grid =
           grid
           |> Grid.put_cell(grid_cell)
           |> Grid.put_cell(next_cell)
-        # print(grid)
-        # :timer.sleep(1)
+        print(grid)
+        :timer.sleep(1)
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
         carve_cells(grid, [{nx, ny}|cells], direction)
         # carve_cells(grid, cells)
