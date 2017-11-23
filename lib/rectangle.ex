@@ -36,15 +36,15 @@ defmodule Rectangle do
 
   ### Examples
 
-      iex> Rectangle.within?(%Rectangle{x: 1, y: 1, height: 1, width: 2}, {1, 3})
+      iex> Rectangle.within?(%Rectangle{x: 1, y: 1, width: 1, height: 2}, {1, 3})
       true
 
-      iex> Rectangle.within?(%Rectangle{x: 1, y: 1, height: 1, width: 1}, {1, 3})
+      iex> Rectangle.within?(%Rectangle{x: 1, y: 1, width: 1, height: 1}, {1, 3})
       false
   """
   @spec within?(Rectangle.t, coords) :: boolean
-  def within?(%Rectangle{x: x, y: y, height: h, width: w}, {cx, cy}) do
-    (cx >= x and cx <= (x + h)) and (cy >= y and cy <= (y + w))
+  def within?(%Rectangle{x: x, y: y, width: w, height: h}, {cx, cy}) do
+    (cx >= x and cx <= (x + w)) and (cy >= y and cy <= (y + h))
   end
 
   @doc """
@@ -63,15 +63,32 @@ defmodule Rectangle do
   """
   @spec overlaps?(Rectangle.t, Rectangle.t) :: boolean
   def overlaps?(%Rectangle{
-    x: x,
-    y: y,
-    width: width,
-    height: height
-  }, %Rectangle{} = rect) do
-    within?(rect, {x, y}) or
-      within?(rect, {x + width, y}) or
-      within?(rect, {x, y + height}) or
-      within?(rect, {x + height, y + width})
+    x: x1,
+    y: y1,
+    width: w1,
+    height: h1
+  }, %Rectangle{
+    x: x2,
+    y: y2,
+    width: w2,
+    height: h2
+  } = rect) do
+    cond do
+      x1 > (x2 + w2) ->
+        false
+      x2 > (x1 + w1) ->
+        false
+      y1 > (y2 + h2) ->
+        false
+      y2 > (y1 + h1) ->
+        false
+      true ->
+        true
+    end
+    # within?(rect, {x, y}) or
+    #   within?(rect, {x + width, y}) or
+    #   within?(rect, {x, y + height}) or
+    #   within?(rect, {x + height, y + width})
   end
 
 end

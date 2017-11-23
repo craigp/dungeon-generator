@@ -14,6 +14,7 @@ defmodule Cell do
 
   @type t :: %__MODULE__{}
 
+  @is_doorway 32
   @in_room 16
   @open_north 1
   @open_south 2
@@ -66,14 +67,46 @@ defmodule Cell do
   end
 
   @doc """
+  Sets a cell to be a doorway.
+
+  ### Examples
+
+      iex> Cell.new(1, 2) |> Cell.is_doorway
+      %Cell{x: 1, y: 2, val: 32}
+
+      iex> Cell.new(1, 2) |> Cell.open(:north) |> Cell.is_doorway
+      %Cell{x: 1, y: 2, val: 33}
+  """
+  @spec is_doorway(Cell.t) :: Cell.t
+  def is_doorway(%Cell{val: val} = cell) do
+    %{cell | val: Bitwise.bor(val, @is_doorway)}
+  end
+
+  @doc """
+  Checks if a cell is a doorway.
+
+  ### Examples
+
+      iex> Cell.new(1, 2) |> Cell.is_doorway?
+      false
+
+      iex> Cell.new(1, 2) |> Cell.is_doorway |> Cell.is_doorway?
+      true
+  """
+  @spec is_doorway?(Cell.t) :: boolean
+  def is_doorway?(%Cell{val: val}) do
+    @is_doorway == Bitwise.band(val, @is_doorway)
+  end
+
+  @doc """
   Checks if the cell is within a grid area.
 
   ### Examples
 
-      iex> Cell.new(1, 3) |> Cell.within?(%Rectangle{x: 1, y: 1, height: 1, width: 2})
+      iex> Cell.new(1, 3) |> Cell.within?(%Rectangle{x: 1, y: 1, width: 1, height: 2})
       true
 
-      iex> Cell.new(1, 3) |> Cell.within?(%Rectangle{x: 1, y: 1, height: 1, width: 1})
+      iex> Cell.new(1, 3) |> Cell.within?(%Rectangle{x: 1, y: 1, width: 1, height: 1})
       false
 
       iex> Cell.new(2, 2) |> Cell.within?(%Circle{x: 3, y: 3, radius: 3})
@@ -95,7 +128,7 @@ defmodule Cell do
   end
 
   @doc """
-  Open cell to the north.
+  Open cell to the given direction.
 
   ### Examples
 
@@ -123,6 +156,33 @@ defmodule Cell do
 
   def open(%Cell{val: val} = cell, :west) do
     %{cell | val: Bitwise.bor(val, @open_west)}
+  end
+
+  @doc """
+  Checks is a cell is open in the given direction.
+
+  ### Examples
+      iex> Cell.new(1,2) |> Cell.open(:north) |> Cell.open?(:north)
+      true
+
+      iex> Cell.new(1,2) |> Cell.open(:south) |> Cell.open?(:north)
+      false
+  """
+  @spec open?(Cell.t, :north | :south | :east | :west) :: boolean
+  def open?(%Cell{val: val} = cell, :north) do
+    @open_north == Bitwise.band(val, @open_north)
+  end
+
+  def open?(%Cell{val: val} = cell, :south) do
+    @open_south == Bitwise.band(val, @open_south)
+  end
+
+  def open?(%Cell{val: val} = cell, :east) do
+    @open_east == Bitwise.band(val, @open_east)
+  end
+
+  def open?(%Cell{val: val} = cell, :west) do
+    @open_west == Bitwise.band(val, @open_west)
   end
 
 end

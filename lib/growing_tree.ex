@@ -16,9 +16,9 @@ defmodule GrowingTree do
     # end)
     IO.write "\e[2J" # clear the screen
     {grid, rooms} = create_rooms(grid, 1000)
-    # grid = carve_passages(grid)
-    # grid = find_connectors(grid, rooms)
-    # grid = remove_deadends(grid)
+    grid = carve_passages(grid)
+    grid = find_connectors(grid, rooms)
+    grid = remove_deadends(grid)
     print(grid)
     :ok
   end
@@ -122,7 +122,7 @@ defmodule GrowingTree do
       deadends = [{nx, ny, List.first(exits)}|deadends]
     end
     print(grid)
-    :timer.sleep(10)
+    :timer.sleep(1)
     remove_deadends(deadends, grid)
   end
 
@@ -167,33 +167,40 @@ defmodule GrowingTree do
       end
     end)
     grid = Enum.reduce(rooms, grid, fn room, grid ->
-      grid = grid
-      |> Grid.cells(room)
-      |> Enum.map(&Cell.in_room/1)
-      |> Enum.reduce(grid, fn cell, grid ->
-        Grid.put_cell(grid, cell)
-      end)
-      print(grid)
-     :timer.sleep(100)
-      grid
+      cells =
+        grid
+        |> Grid.cells(room)
+        |> Enum.map(&Cell.in_room/1)
+      Grid.put_cells(grid, cells)
     end)
     {grid, rooms}
   end
+
+    # def create_room(width, height, grid) do
+    # room_size_range = 2..3
+    # size = (room_size_range |> Enum.random)
+    # room_width = size
+    # room_height = size
+    # case Enum.random(1..2) do
+    #   1 ->
+    #     room_width = (size + Enum.random(0..1)) * 2
+    #   2 ->
+    #     room_height = (size + Enum.random(0..1)) * 2
+    # end
+    # # get a random y position, making sure to avoid the top and bottom wall
+    # room_y_index = Enum.random(1..(height - room_height - 2))
+    # # get a random x position, making sure to avoid the left and right wall
+    # room_x_index = Enum.random(1..(width - room_width - 2))
+    # IO.inspect {room_x_index, room_y_index, room_width, room_height}
+    # {room_x_index, room_y_index, room_width, room_height}
+  # end
 
   @doc """
   Create a room, being an `x` & `y` start coordinate and a width and height.
   """
   def create_room(%Grid{height: height, width: width}) do
-    room_size_range = 2..3
-    size = (room_size_range |> Enum.random)
-    room_width = size
-    room_height = size
-    case Enum.random(1..2) do
-      1 ->
-        room_width = (size + Enum.random(0..1)) * 2
-      2 ->
-        room_height = (size + Enum.random(0..1)) * 2
-    end
+    room_width = random_dimension()
+    room_height = random_dimension()
     # get a random y position, making sure to avoid the top and bottom wall
     room_y_index = Enum.random(1..(height - room_height - 2))
     # get a random x position, making sure to avoid the left and right wall
@@ -280,8 +287,8 @@ defmodule GrowingTree do
           |> Cell.open(card)
           |> Cell.open(get_opposite_direction(card))
         grid = Grid.put_cell(grid, grid_cell)
-        print(grid)
-        :timer.sleep(1)
+        # print(grid)
+        # :timer.sleep(1)
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
         carve_cells(grid, [{nx, ny}|cells], direction)
         # carve_cells(grid, cells)
@@ -309,24 +316,25 @@ defmodule GrowingTree do
       row
       |> Enum.with_index
       |> Enum.each(fn {%Cell{val: val} = cell, x} ->
-        if Bitwise.band(val, 16) != 0 do
+        if Cell.in_room?(cell) do
           # this is a room
-          %Cell{val: next_val} = Enum.at(row, x + 1)
-          if Bitwise.band(next_val, 16) != 0 do # cell to the right/west is a room cell
-            if Bitwise.band(val, 32) != 0 do # door
+          # get the cell to the right/west
+          %Cell{val: next_val} = next_cell = Enum.at(row, x + 1)
+          if Cell.in_room?(next_cell) do # cell to the right/east is a room cell
+            if Cell.is_doorway?(cell) do
               [:color236_background, :color150, "d"]
               |> Bunt.ANSI.format
               |> IO.write
               [:color236_background, :color240, "."]
               |> Bunt.ANSI.format
               |> IO.write
-            else # cell to the right/west is *not* a room cell
+            else # cell to the right/east is *not* a room cell
               [:color236_background, :color240, ".."]
               |> Bunt.ANSI.format
               |> IO.write
             end
           else
-            if Bitwise.band(val, 32) != 0 do
+            if Cell.is_doorway?(cell) do
               [:color236_background, :color150, "d "]
               |> Bunt.ANSI.format
               |> IO.write
@@ -343,16 +351,16 @@ defmodule GrowingTree do
           # not a room
           if val != 0 do
             # not empty (probably a corridor)
-            if Bitwise.band(val, 2) != 0 do
+            if Cell.open?(cell, :south) do
               " " # open to the south
             else
               "_" # not open to the south
             end |> write(236)
-            if Bitwise.band(val, 4) != 0 do
-              # open to the east
+            if Cell.open?(cell, :east) do
+              # get the cell to the east/right
               case Enum.at(row, x + 1) do
-                %Cell{val: next_val} ->
-                  if Bitwise.bor(next_val, 2) != 0 do # is the next cell open to the south?
+                %Cell{val: next_val} = next_cell ->
+                  if Cell.open?(next_cell, :south) do # is the next cell open to the south?
                     " "
                   else
                     "_"
@@ -376,6 +384,10 @@ defmodule GrowingTree do
       end)
       IO.puts ""
     end)
+  end
+
+  def random_dimension do
+    (Enum.random(2..3) + Enum.random(0..1)) * 2
   end
 
 end
