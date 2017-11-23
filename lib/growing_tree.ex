@@ -19,8 +19,8 @@ defmodule GrowingTree do
     grid = carve_passages(grid)
     grid = find_connectors(grid, rooms)
     # grid = remove_deadends(grid)
-    # print(grid)
-    grid
+    print(grid)
+    :ok
   end
 
   def opposite({card, _}), do: opposite(card)
@@ -74,15 +74,13 @@ defmodule GrowingTree do
   end
 
   def remove_deadends(%Grid{cells: cells} = grid) do
-    IO.puts "remove_deadends1"
     Enum.reduce(cells, [], fn row, deadends ->
       Enum.reduce(row, deadends, fn cell, deadends ->
         unless Cell.is_doorway?(cell) do
           case get_exits(cell) do
             [exit|[]] -> # only if the cell has _only_ one exit
               [{cell, exit}|deadends]
-            wat ->
-              IO.inspect wat
+            _ ->
               deadends
           end
         else
@@ -90,18 +88,13 @@ defmodule GrowingTree do
         end
       end)
     end)
-    |> IO.inspect
     |> remove_deadends(grid)
   end
 
-  def remove_deadends([], grid) do
-    IO.puts "FUCK"
-    grid
-  end
+  def remove_deadends([], grid), do: grid
 
   def remove_deadends([{%Cell{x: x, y: y} = cell, {card, {bw, dx, dy}} = exit} = deadend|deadends], grid) do
-    IO.puts "remove_deadends2"
-    IO.puts "removing deadend at #{x}/#{y} with exit #{card}"
+    # IO.puts "removing deadend at #{x}/#{y} with exit #{card}"
     grid = update_cell_with(grid, x, y, 0) # not sure why I do this, this clears all exits
     nx = x + dx
     ny = y + dy
@@ -115,13 +108,12 @@ defmodule GrowingTree do
     ncell = Cell.close(ncell, ncard)
     grid = Grid.put_cell(grid, ncell)
     exits = Grid.cell_at(grid, {nx, ny}) |> get_exits
-    IO.puts "cell should now have one less exit: #{length(exits)}"
+    # IO.puts "cell should now have one less exit: #{length(exits)}"
     if length(exits) == 1 do
-      IO.puts "added to deadends"
       deadends = [{Grid.cell_at(grid, {nx, ny}), List.first(exits)}|deadends]
     end
-    # print grid
-    # :timer.sleep(100)
+    print grid
+    :timer.sleep(1)
     remove_deadends(deadends, grid)
   end
 
@@ -133,19 +125,23 @@ defmodule GrowingTree do
     end)
     |> Enum.reduce(grid, fn {{rx, _ry, _, _}, x, y}, grid ->
       %Cell{} = cell = Grid.cell_at(grid, {x, y})
-      grid = update_cell(grid, x, y, 32)
-      {_card, {bw, dx, dy}} = direction = if x == rx do
+      cell = Cell.is_doorway(cell)
+      grid = Grid.put_cell(grid, cell)
+      {card, {_bw, dx, dy}} = direction = if x == rx do
         # on the eastern side of the room
         get_direction(:west) # open to the west
       else
         # on the western side of the woom
         get_direction(:east) # open to the east
       end
-      grid = update_cell(grid, x, y, bw)
+      # grid = update_cell(grid, x, y, bw)
+      cell = Cell.open(cell, card)
       nx = x + dx
       ny = y + dy
-      {_, {bw, _, _}} = opposite(direction)
-      _grid = update_cell(grid, nx, ny, bw)
+      {ncard, {_bw, _, _}} = opposite(direction)
+      ncell = Grid.cell_at(grid, {nx, ny}) |> Cell.open(ncard)
+      # _grid = update_cell(grid, nx, ny, bw)
+      Grid.put_cell(grid, ncell)
     end)
   end
 
@@ -281,12 +277,13 @@ defmodule GrowingTree do
     nx = x + dx
     ny = y + dy
     case Grid.cell_at(grid, {nx, ny}) do
-      %Cell{val: 0} = grid_cell ->
-        grid_cell =
-          grid_cell
-          |> Cell.open(card)
-          |> Cell.open(get_opposite_direction(card))
-        grid = Grid.put_cell(grid, grid_cell)
+      %Cell{val: 0} = next_cell ->
+        grid_cell = Cell.open(Grid.cell_at(grid, cell), card)
+        next_cell = Cell.open(next_cell, get_opposite_direction(card))
+        grid =
+          grid
+          |> Grid.put_cell(grid_cell)
+          |> Grid.put_cell(next_cell)
         # print(grid)
         # :timer.sleep(1)
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
@@ -316,66 +313,66 @@ defmodule GrowingTree do
       row
       |> Enum.with_index
       |> Enum.each(fn {%Cell{val: val} = cell, x} ->
-        if Cell.in_room?(cell) do
-          # this is a room
-          # get the cell to the right/west
-          %Cell{val: next_val} = next_cell = Enum.at(row, x + 1)
-          if Cell.in_room?(next_cell) do # cell to the right/east is a room cell
-            if Cell.is_doorway?(cell) do
-              [:color236_background, :color150, "d"]
-              |> Bunt.ANSI.format
-              |> IO.write
-              [:color236_background, :color240, "."]
-              |> Bunt.ANSI.format
-              |> IO.write
-            else # cell to the right/east is *not* a room cell
-              [:color236_background, :color240, ".."]
-              |> Bunt.ANSI.format
-              |> IO.write
-            end
-          else
-            if Cell.is_doorway?(cell) do
-              [:color236_background, :color150, "d "]
-              |> Bunt.ANSI.format
-              |> IO.write
-            else
-              [:color236_background, :color240, "."]
-              |> Bunt.ANSI.format
-              |> IO.write
-              [:color236_background, "|"]
-              |> Bunt.ANSI.format
-              |> IO.write
-            end
-          end
+        if {x, y} == current_cell do
+          [:color236_background, :color150, "X|"]
+          |> Bunt.ANSI.format
+          |> IO.write
         else
-          # not a room
-          if val != 0 do
-            # not empty (probably a corridor)
-            if Cell.open?(cell, :south) do
-              " " # open to the south
-            else
-              "_" # not open to the south
-            end |> write(236)
-            if Cell.open?(cell, :east) do
-              # get the cell to the east/right
-              case Enum.at(row, x + 1) do
-                %Cell{val: next_val} = next_cell ->
-                  if Cell.open?(next_cell, :south) do # is the next cell open to the south?
-                    " "
-                  else
-                    "_"
-                  end
-                nil ->
-                  "_"
+          if Cell.in_room?(cell) do
+            # this is a room
+            # get the cell to the right/west
+            %Cell{val: next_val} = next_cell = Enum.at(row, x + 1)
+            if Cell.in_room?(next_cell) do # cell to the right/east is a room cell
+              if Cell.is_doorway?(cell) do
+                [:color236_background, :color150, "d"]
+                |> Bunt.ANSI.format
+                |> IO.write
+                [:color236_background, :color240, "."]
+                |> Bunt.ANSI.format
+                |> IO.write
+              else # cell to the right/east is *not* a room cell
+                [:color236_background, :color240, ".."]
+                |> Bunt.ANSI.format
+                |> IO.write
               end
             else
-              "|" # not open to the east
-            end |> write(236)
+              if Cell.is_doorway?(cell) do
+                [:color236_background, :color150, "d "]
+                |> Bunt.ANSI.format
+                |> IO.write
+              else
+                [:color236_background, :color240, "."]
+                |> Bunt.ANSI.format
+                |> IO.write
+                [:color236_background, "|"]
+                |> Bunt.ANSI.format
+                |> IO.write
+              end
+            end
           else
-            if {x, y} == current_cell do
-              [:color236_background, :color150, "X|"]
-              |> Bunt.ANSI.format
-              |> IO.write
+            # not a room
+            if val != 0 do
+              # not empty (probably a corridor)
+              if Cell.open?(cell, :south) do
+                " " # open to the south
+              else
+                "_" # not open to the south
+              end |> write(236)
+              if Cell.open?(cell, :east) do
+                # get the cell to the east/right
+                case Enum.at(row, x + 1) do
+                  %Cell{val: next_val} = next_cell ->
+                    if Cell.open?(next_cell, :south) do # is the next cell open to the south?
+                      " "
+                    else
+                      "_"
+                    end
+                  nil ->
+                    "_"
+                end
+              else
+                "|" # not open to the east
+              end |> write(236)
             else
               "_|" |> write(240)
             end
