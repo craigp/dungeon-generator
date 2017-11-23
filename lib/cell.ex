@@ -185,4 +185,35 @@ defmodule Cell do
     @open_west == Bitwise.band(val, @open_west)
   end
 
+  @doc """
+  Close cell to the given direction.
+
+  ### Examples
+
+      iex> Cell.new(1, 2) |> Cell.open(:north) |> Cell.close(:north)
+      %Cell{x: 1, y: 2, val: 0}
+
+      iex> Cell.new(1, 2) |> Cell.open(:north) |> Cell.close(:north) |> Cell.open?(:north)
+      false
+
+      iex> Cell.new(1, 2) |> Cell.open(:north) |> Cell.open(:south) |> Cell.close(:north) |> Cell.open?(:south)
+      true
+  """
+  @spec close(Cell.t, :north | :south | :east | :west) :: Cell.t
+  def close(%Cell{val: val} = cell, :north) do
+    %{cell | val: Bitwise.bxor(val, @open_north)}
+  end
+
+  def close(%Cell{val: val} = cell, :south) do
+    %{cell | val: Bitwise.bxor(val, @open_south)}
+  end
+
+  def close(%Cell{val: val} = cell, :east) do
+    %{cell | val: Bitwise.bxor(val, @open_east)}
+  end
+
+  def close(%Cell{val: val} = cell, :west) do
+    %{cell | val: Bitwise.bxor(val, @open_west)}
+  end
+
 end

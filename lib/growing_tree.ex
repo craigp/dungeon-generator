@@ -18,9 +18,9 @@ defmodule GrowingTree do
     {grid, rooms} = create_rooms(grid, 1000)
     grid = carve_passages(grid)
     grid = find_connectors(grid, rooms)
-    grid = remove_deadends(grid)
-    print(grid)
-    :ok
+    # grid = remove_deadends(grid)
+    # print(grid)
+    grid
   end
 
   def opposite({card, _}), do: opposite(card)
@@ -32,7 +32,6 @@ defmodule GrowingTree do
       :west -> :east
       :east -> :west
     end |> get_direction
-    bw
   end
 
   def get_opposite_direction(dir) do
@@ -65,8 +64,8 @@ defmodule GrowingTree do
   end
 
   def get_exits(%Cell{val: val} = cell) do
-    Enum.reduce(get_directions(), [], fn {_card, {bw, _dx, _dy}} = direction, exits ->
-      if Bitwise.band(val, bw) != 0 do
+    Enum.reduce(get_directions(), [], fn {card, {_bw, _dx, _dy}} = direction, exits ->
+      if Cell.open?(cell, card) do
         [direction|exits]
       else
         exits
@@ -75,54 +74,54 @@ defmodule GrowingTree do
   end
 
   def remove_deadends(%Grid{cells: cells} = grid) do
-    cells
-    |> Enum.with_index
-    |> Enum.reduce([], fn {row, y}, deadends ->
-      row
-      |> Enum.with_index
-      |> Enum.reduce(deadends, fn {%Cell{val: val} = cell, x}, deadends ->
-        if Bitwise.band(val, 32) == 0 do # not a door
-          exits = get_exits(cell)
-          if length(exits) == 1 do
-            [{x, y, List.first(exits)}|deadends]
-          else
-            deadends
+    IO.puts "remove_deadends1"
+    Enum.reduce(cells, [], fn row, deadends ->
+      Enum.reduce(row, deadends, fn cell, deadends ->
+        unless Cell.is_doorway?(cell) do
+          case get_exits(cell) do
+            [exit|[]] -> # only if the cell has _only_ one exit
+              [{cell, exit}|deadends]
+            wat ->
+              IO.inspect wat
+              deadends
           end
         else
           deadends
         end
       end)
     end)
+    |> IO.inspect
     |> remove_deadends(grid)
   end
 
   def remove_deadends([], grid) do
+    IO.puts "FUCK"
     grid
   end
 
-  def remove_deadends([deadend|deadends], grid) do
-    # Enum.random(deadends) |> remove_deadends(deadends, grid)
-    remove_deadends(deadend, deadends, grid)
-  end
-
-  def remove_deadends({x, y, {card, {_bw, dx, dy}} = _exit} = _deadend, deadends, grid) do
-    # IO.puts "removing deadend at #{x}/#{y} with exit #{card}"
-    grid = update_cell_with(grid, x, y, 0)
+  def remove_deadends([{%Cell{x: x, y: y} = cell, {card, {bw, dx, dy}} = exit} = deadend|deadends], grid) do
+    IO.puts "remove_deadends2"
+    IO.puts "removing deadend at #{x}/#{y} with exit #{card}"
+    grid = update_cell_with(grid, x, y, 0) # not sure why I do this, this clears all exits
     nx = x + dx
     ny = y + dy
-    ncell = get_cell_at(grid, nx, ny)
-    bw = opposite(card)
+    # get the cell in the direction of the exit
+    %Cell{val: nval} = ncell = Grid.cell_at(grid, {nx, ny})
+    #get the opposite direction, we're going to close the exit behind us
+    {ncard, {bw, _, _}} = opposite(card)
     # exits = get_cell_at(grid, nx, ny) |> get_exits
     # IO.puts "updating exit cell at #{nx}/#{ny} xor with #{bw} with #{length(exits)} exits"
-    grid = update_cell_with(grid, nx, ny, Bitwise.bxor(ncell, bw))
-    exits = get_cell_at(grid, nx, ny) |> get_exits
-    # IO.puts "cell should now have one less exit: #{length(exits)}"
+    # grid = update_cell_with(grid, nx, ny, Bitwise.bxor(nval, bw))
+    ncell = Cell.close(ncell, ncard)
+    grid = Grid.put_cell(grid, ncell)
+    exits = Grid.cell_at(grid, {nx, ny}) |> get_exits
+    IO.puts "cell should now have one less exit: #{length(exits)}"
     if length(exits) == 1 do
-      # IO.puts "added to deadends"
-      deadends = [{nx, ny, List.first(exits)}|deadends]
+      IO.puts "added to deadends"
+      deadends = [{Grid.cell_at(grid, {nx, ny}), List.first(exits)}|deadends]
     end
-    print(grid)
-    :timer.sleep(1)
+    # print grid
+    # :timer.sleep(100)
     remove_deadends(deadends, grid)
   end
 
@@ -145,7 +144,8 @@ defmodule GrowingTree do
       grid = update_cell(grid, x, y, bw)
       nx = x + dx
       ny = y + dy
-      _grid = update_cell(grid, nx, ny, opposite(direction))
+      {_, {bw, _, _}} = opposite(direction)
+      _grid = update_cell(grid, nx, ny, bw)
     end)
   end
 
@@ -239,10 +239,10 @@ defmodule GrowingTree do
     Grid.put_cell(grid, cell)
   end
 
-  def get_cell_at(grid, x, y) do
-    row = Enum.at(grid, y)
-    Enum.at(row, x)
-  end
+  # def get_cell_at(grid, x, y) do
+  #   row = Enum.at(grid, y)
+  #   Enum.at(row, x)
+  # end
 
   def carve_cells(grid, cells) when length(cells) > 0 do
     directions =
