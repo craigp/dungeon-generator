@@ -55,7 +55,6 @@ defmodule Grid do
     yr = y..(y + height - 1)
     Enum.reduce(xr, [], fn x, cells ->
       Enum.reduce(yr, cells, fn y, cells ->
-        # [cell_at(grid, {x, y})|cells]
         case cell_at(grid, {x, y}) do
           %Cell{} = cell ->
             [cell|cells]
@@ -158,6 +157,11 @@ defmodule Grid do
       |> List.replace_at(x, cell)
     new_cells = List.replace_at(cells, y, row)
     %{grid | cells: new_cells}
+  end
+
+  def put_cells(%Grid{} = grid, []), do: grid
+  def put_cells(%Grid{} = grid, cells) when is_list(cells) do
+    Enum.reduce(cells, grid, &Grid.put_cell(&2, &1))
   end
 
 end

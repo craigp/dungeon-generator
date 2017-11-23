@@ -50,9 +50,10 @@ defmodule Room do
   }) do
     Rectangle.overlaps?(to_room_overlap_rect(rect1),
       to_room_overlap_rect(rect2))
+    # Rectangle.overlaps?(rect1, rect2)
   end
 
-  defp to_room_overlap_rect(%Rectangle{
+  def to_room_overlap_rect(%Rectangle{
     x: x,
     y: y,
     width: width,
@@ -61,8 +62,8 @@ defmodule Room do
     %Rectangle{
       x: x - 1,
       y: y - 1,
-      width: width + 2,
-      height: height + 2
+      width: width + 1,
+      height: height + 1
     }
   end
 
