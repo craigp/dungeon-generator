@@ -38,30 +38,16 @@ defmodule Room do
       true
 
       iex> room1 = Rectangle.new(2, 2, 2, 2) |> Room.new
-      iex> room2 = Rectangle.new(7, 7, 2, 2) |> Room.new
+      iex> room2 = Rectangle.new(10, 10, 2, 2) |> Room.new
       iex> Room.overlaps?(room1, room2)
       false
   """
   @spec overlaps?(Room.t, Room.t) :: boolean
   def overlaps?(%Room{
-    rect: %Rectangle{
-      x: x,
-      y: y,
-      width: width,
-      height: height
-    } = rect1
+    rect: %Rectangle{} = rect1
   }, %Room{
-    rect: %Rectangle{
-      x: other_x,
-      y: other_y,
-      width: other_width,
-      height: other_height
-    } = rect2
+    rect: %Rectangle{} = rect2
   }) do
-    # not((((x - 1) + width + 2) < other_x) or
-    #   ((other_x + other_width + 2) < x) or
-    #   (((y - 1) + height + 2) < other_y) or
-    #   ((other_y + other_height + 2) < y))
     Rectangle.overlaps?(to_room_overlap_rect(rect1),
       to_room_overlap_rect(rect2))
   end

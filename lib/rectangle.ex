@@ -68,7 +68,10 @@ defmodule Rectangle do
     width: width,
     height: height
   }, %Rectangle{} = rect) do
-    within?(rect, {x, y}) or within?(rect, {x + height, y + width})
+    within?(rect, {x, y}) or
+      within?(rect, {x + width, y}) or
+      within?(rect, {x, y + height}) or
+      within?(rect, {x + height, y + width})
   end
 
 end

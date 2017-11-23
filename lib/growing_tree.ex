@@ -16,7 +16,7 @@ defmodule GrowingTree do
     # end)
     IO.write "\e[2J" # clear the screen
     {grid, rooms} = create_rooms(grid, 1000)
-    grid = carve_passages(grid)
+    # grid = carve_passages(grid)
     # grid = find_connectors(grid, rooms)
     # grid = remove_deadends(grid)
     print(grid)
@@ -167,12 +167,15 @@ defmodule GrowingTree do
       end
     end)
     grid = Enum.reduce(rooms, grid, fn room, grid ->
-      grid
+      grid = grid
       |> Grid.cells(room)
       |> Enum.map(&Cell.in_room/1)
       |> Enum.reduce(grid, fn cell, grid ->
         Grid.put_cell(grid, cell)
       end)
+      print(grid)
+     :timer.sleep(100)
+      grid
     end)
     {grid, rooms}
   end
@@ -181,9 +184,8 @@ defmodule GrowingTree do
   Create a room, being an `x` & `y` start coordinate and a width and height.
   """
   def create_room(%Grid{height: height, width: width}) do
-    # pick a random room size between 2 & 3
-    size = Enum.random(2..3)
-    # randomize the dimensions a bit
+    room_size_range = 2..3
+    size = (room_size_range |> Enum.random)
     room_width = size
     room_height = size
     case Enum.random(1..2) do
@@ -193,9 +195,9 @@ defmodule GrowingTree do
         room_height = (size + Enum.random(0..1)) * 2
     end
     # get a random y position, making sure to avoid the top and bottom wall
-    room_y_index = Enum.random(2..(height - room_height - 2))
+    room_y_index = Enum.random(1..(height - room_height - 2))
     # get a random x position, making sure to avoid the left and right wall
-    room_x_index = Enum.random(2..(width - room_width - 2))
+    room_x_index = Enum.random(1..(width - room_width - 2))
     %Room{
       rect: %Rectangle{
         x: room_x_index,
@@ -362,13 +364,14 @@ defmodule GrowingTree do
               "|" # not open to the east
             end |> write(236)
           else
-            "_|" |> write(240)
+            if {x, y} == current_cell do
+              [:color236_background, :color150, "X|"]
+              |> Bunt.ANSI.format
+              |> IO.write
+            else
+              "_|" |> write(240)
+            end
           end
-        end
-        if {x, y} == current_cell do
-          [:color236_background, :color150, "X"]
-          |> Bunt.ANSI.format
-          |> IO.write
         end
       end)
       IO.puts ""
