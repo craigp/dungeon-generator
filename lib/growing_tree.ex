@@ -288,7 +288,7 @@ defmodule GrowingTree do
     nx = x + dx
     ny = y + dy
     case Grid.cell_at(grid, {nx, ny}) do
-      %Cell{} = next_cell ->
+      %Cell{val: 0} = next_cell ->
         grid_cell = Cell.open(Grid.cell_at(grid, cell), card)
         next_cell = Cell.open(next_cell, get_opposite_direction(card))
         grid =
