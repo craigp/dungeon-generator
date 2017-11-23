@@ -18,7 +18,7 @@ defmodule GrowingTree do
     {grid, rooms} = create_rooms(grid, 1000)
     grid = carve_passages(grid)
     grid = find_connectors(grid, rooms)
-    # grid = remove_deadends(grid)
+    grid = remove_deadends(grid)
     print(grid)
     :ok
   end
@@ -119,8 +119,8 @@ defmodule GrowingTree do
 
   def find_connectors(%Grid{} = grid, rooms) do
     Enum.map(rooms, fn %Room{rect: %Rectangle{x: rx, y: ry, width: width, height: height}} = room ->
-      y = Enum.random(ry..(ry + height))
-      x = Enum.random([rx, (rx + width)])
+      y = Enum.random(ry..(ry + height - 1))
+      x = Enum.random([rx, (rx + width - 1)])
       {{rx, ry, width, height}, x, y}
     end)
     |> Enum.reduce(grid, fn {{rx, _ry, _, _}, x, y}, grid ->
@@ -131,6 +131,7 @@ defmodule GrowingTree do
         # on the eastern side of the room
         get_direction(:west) # open to the west
       else
+        IO.inspect east: {x, y}
         # on the western side of the woom
         get_direction(:east) # open to the east
       end
