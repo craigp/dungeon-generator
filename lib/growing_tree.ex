@@ -16,8 +16,10 @@ defmodule GrowingTree do
     # end)
     IO.write "\e[2J" # clear the screen
     {grid, rooms} = create_rooms(grid, 1000)
-    grid = find_connectors(grid, rooms)
     grid = carve_passages(grid, rooms)
+    grid = Enum.reduce(rooms, grid, fn room, grid ->
+      make_doorway(grid, room)
+    end)
     grid = remove_deadends(grid)
     print(grid)
     IO.inspect Grid.cell_at(grid, {0, 0})
@@ -118,38 +120,40 @@ defmodule GrowingTree do
     remove_deadends(deadends, grid)
   end
 
-  def find_connectors(%Grid{} = grid, rooms) do
-    Enum.map(rooms, fn %Room{rect: %Rectangle{x: rx, y: ry, width: width, height: height}} = room ->
-      y = Enum.random(ry..(ry + height - 1))
-      x = Enum.random([rx, (rx + width - 1)])
-      {{rx, ry, width, height}, x, y}
-    end)
-    |> Enum.reduce(grid, fn {{rx, _ry, _, _}, x, y}, grid ->
-      {card, {_bw, dx, dy}} = direction = if x == rx do
-        # on the eastern side of the room
-        get_direction(:west) # open to the west
-      else
-        # on the western side of the woom
-        get_direction(:east) # open to the east
-      end
-      # open the cell in the direction of the doorway
-      cell =
-        grid
-        |> Grid.cell_at({x, y})
-        |> Cell.is_doorway
-        |> Cell.open(card)
-      grid = Grid.put_cell(grid, cell)
-      # get the next cell in that direction (outside the room)
-      nx = x + dx
-      ny = y + dy
-      {ncard, {_bw, _, _}} = opposite(direction)
-      # open this cell in the opposite direction, into the room
-      next_cell =
-        grid
-        |> Grid.cell_at({nx, ny})
-        |> Cell.open(ncard)
-      Grid.put_cell(grid, next_cell)
-    end)
+  def make_doorway(%Grid{} = grid, %Room{
+    rect: %Rectangle{
+      x: rx,
+      y: ry,
+      width: width,
+      height: height
+    }
+  } = room) do
+    y = Enum.random(ry..(ry + height - 1))
+    x = Enum.random([rx, (rx + width - 1)])
+    {card, {_bw, dx, dy}} = direction = if x == rx do
+      # on the eastern side of the room
+      get_direction(:west) # open to the west
+    else
+      # on the western side of the woom
+      get_direction(:east) # open to the east
+    end
+    # open the cell in the direction of the doorway
+    cell =
+      grid
+      |> Grid.cell_at({x, y})
+      |> Cell.is_doorway
+      |> Cell.open(card)
+    grid = Grid.put_cell(grid, cell)
+    # get the next cell in that direction (outside the room)
+    nx = x + dx
+    ny = y + dy
+    {ncard, {_bw, _, _}} = opposite(direction)
+    # open this cell in the opposite direction, into the room
+    next_cell =
+      grid
+      |> Grid.cell_at({nx, ny})
+      |> Cell.open(ncard)
+    Grid.put_cell(grid, next_cell)
   end
 
   @doc """
@@ -219,13 +223,14 @@ defmodule GrowingTree do
   end
 
   def carve_passages(%Grid{height: height, width: width} = grid, rooms) do
-    [room|_] = Enum.shuffle(rooms)
-    cells = Grid.cells(grid, room)
-    %Cell{x: x, y: y} = doorway = Enum.find(cells, &Cell.is_doorway?/1)
-    [{card, {_, dx, dy}}|_] = get_exits(doorway)
-    cells = [{x + dx, y + dy}]
-    # x = Enum.random(0..width-1)
-    # y = Enum.random(0..height-1)
+    # [room|_] = Enum.shuffle(rooms)
+    # cells = Grid.cells(grid, room)
+    # %Cell{x: x, y: y} = doorway = Enum.find(cells, &Cell.is_doorway?/1)
+    # [{card, {_, dx, dy}}|_] = get_exits(doorway)
+    # cells = [{x + dx, y + dy}]
+    x = Enum.random(0..width-1)
+    y = Enum.random(0..height-1)
+    cells = [{x, y}]
     carve_cells(grid, cells)
   end
 
@@ -252,10 +257,7 @@ defmodule GrowingTree do
   # end
 
   def carve_cells(grid, cells) when length(cells) > 0 do
-    directions =
-      get_directions
-      |> Enum.shuffle
-    carve_cells(grid, cells, directions)
+    carve_cells(grid, cells, Enum.shuffle(get_directions()))
   end
 
   def carve_cells(grid, _cells) do
@@ -267,16 +269,16 @@ defmodule GrowingTree do
     carve_cells(grid, cells, cell, directions)
   end
 
-  def carve_cells(grid, cells, {card, _}) do
+  def carve_cells(grid, cells, {{card, _}, steps}) do
     {direction, directions} = Keyword.pop(get_directions, card)
     cell = List.first(cells)
-    carve_cells(grid, cells, cell, directions, {card, direction})
+    carve_cells(grid, cells, cell, directions, {{card, direction}, steps})
   end
 
   def carve_cells(grid, cells, cell, directions) when length(directions) > 0 do
     key = directions |> Keyword.keys |> List.first
     {direction, directions} = Keyword.pop(directions, key)
-    carve_cells(grid, cells, cell, directions, {key, direction})
+    carve_cells(grid, cells, cell, directions, {{key, direction}, 0})
   end
 
   def carve_cells(grid, cells, _cell, _directions) do
@@ -284,7 +286,7 @@ defmodule GrowingTree do
     carve_cells(grid, updated_cells)
   end
 
-  def carve_cells(grid, cells, {x, y} = cell, directions, {card, {bw, dx, dy}} = direction) when length(cells) > 0 do
+  def carve_cells(%Grid{width: width} = grid, cells, {x, y} = cell, directions, {{card, {bw, dx, dy}} = direction, steps}) when length(cells) > 0 do
     nx = x + dx
     ny = y + dy
     case Grid.cell_at(grid, {nx, ny}) do
@@ -298,7 +300,11 @@ defmodule GrowingTree do
         print(grid)
         :timer.sleep(1)
         # we want to "weight" it in favour of going in straighter lines, so reuse the same direction
-        carve_cells(grid, [{nx, ny}|cells], direction)
+        if steps < trunc(width / 10) do
+          carve_cells(grid, [{nx, ny}|cells], {direction, steps + 1})
+        else
+          carve_cells(grid, [{nx, ny}|cells], Enum.shuffle([direction|directions]))
+        end
         # carve_cells(grid, cells)
       _ ->
         carve_cells(grid, cells, cell, directions)
@@ -309,7 +315,7 @@ defmodule GrowingTree do
     [String.to_atom("color#{color}_background"), text] |> Bunt.ANSI.format |> IO.write
   end
 
-  def print(%Grid{cells: cells}, current_cell \\ {0, 0}) do
+  def print(%Grid{cells: cells} = grid, current_cell \\ {0, 0}) do
     IO.write "\e[H" # move to upper-left
     IO.write " "
     # write the top border
@@ -333,18 +339,31 @@ defmodule GrowingTree do
             # this is a room
             # get the cell to the right/west
             %Cell{val: next_val} = next_cell = Enum.at(row, x + 1)
+            %Cell{} = below = Grid.cell_at(grid, {x, y + 1})
             if Cell.in_room?(next_cell) do # cell to the right/east is a room cell
               if Cell.is_doorway?(cell) do
                 [:color236_background, :color150, "d"]
                 |> Bunt.ANSI.format
                 |> IO.write
-                [:color236_background, :color240, "."]
-                |> Bunt.ANSI.format
-                |> IO.write
-              else # cell to the right/east is *not* a room cell
-                [:color236_background, :color240, ".."]
-                |> Bunt.ANSI.format
-                |> IO.write
+                if Cell.in_room?(below) do
+                  [:color236_background, :color240, "."]
+                  |> Bunt.ANSI.format
+                  |> IO.write
+                else
+                  [:color236_background, :color240, "_"]
+                  |> Bunt.ANSI.format
+                  |> IO.write
+                end
+              else # not a doorway
+                if Cell.in_room?(below) do
+                  [:color236_background, :color240, ".."]
+                  |> Bunt.ANSI.format
+                  |> IO.write
+                else
+                  [:color236_background, :color150, "__"]
+                  |> Bunt.ANSI.format
+                  |> IO.write
+                end
               end
             else
               if Cell.is_doorway?(cell) do
@@ -352,9 +371,15 @@ defmodule GrowingTree do
                 |> Bunt.ANSI.format
                 |> IO.write
               else
-                [:color236_background, :color240, "."]
-                |> Bunt.ANSI.format
-                |> IO.write
+                if Cell.in_room?(below) do
+                  [:color236_background, :color240, "."]
+                  |> Bunt.ANSI.format
+                  |> IO.write
+                else
+                  [:color236_background, :color150, "_"]
+                  |> Bunt.ANSI.format
+                  |> IO.write
+                end
                 [:color236_background, "|"]
                 |> Bunt.ANSI.format
                 |> IO.write
